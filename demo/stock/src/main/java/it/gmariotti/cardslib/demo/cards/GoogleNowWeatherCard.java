@@ -85,7 +85,7 @@ public class GoogleNowWeatherCard extends CardWithList {
         setSwipeable(true);
         setOnSwipeListener(new OnSwipeListener() {
             @Override
-            public void onSwipe(Card card) {
+            public void onSwipe(Card card, boolean dismissRight) {
                 Toast.makeText(getContext(), "Swipe on " + card.getCardHeader().getTitle(), Toast.LENGTH_SHORT).show();
             }
         });

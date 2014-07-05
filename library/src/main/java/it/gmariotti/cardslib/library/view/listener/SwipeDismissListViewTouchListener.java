@@ -22,6 +22,7 @@ import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
 import android.graphics.Rect;
+import android.os.Build;
 import android.os.SystemClock;
 import android.view.MotionEvent;
 import android.view.VelocityTracker;
@@ -122,7 +123,7 @@ public class SwipeDismissListViewTouchListener implements View.OnTouchListener {
          * @param reverseSortedPositions An array of positions to dismiss, sorted in descending
          *                               order for convenience.
          */
-        void onDismiss(ListView listView, int[] reverseSortedPositions);
+        void onDismiss(ListView listView, int[] reverseSortedPositions, boolean dismissRight);
     }
 
     /**
@@ -246,7 +247,8 @@ public class SwipeDismissListViewTouchListener implements View.OnTouchListener {
                     dismiss = true;
                     dismissRight = deltaX > 0;
                 } else if (mMinFlingVelocity <= absVelocityX && absVelocityX <= mMaxFlingVelocity
-                        && absVelocityY < absVelocityX && mSwiping) {
+                        && absVelocityY < absVelocityX && mSwiping
+                        && isDirectionValid(mVelocityTracker.getXVelocity())) {
                     // dismiss only if flinging in the same direction as dragging
                     dismiss = (velocityX < 0) == (deltaX < 0);
                     dismissRight = mVelocityTracker.getXVelocity() > 0;
@@ -310,19 +312,27 @@ public class SwipeDismissListViewTouchListener implements View.OnTouchListener {
                 mVelocityTracker.addMovement(motionEvent);
                 float deltaX = motionEvent.getRawX() - mDownX;
                 float deltaY = motionEvent.getRawY() - mDownY;
-                if (Math.abs(deltaX) > mSlop && Math.abs(deltaY) < Math.abs(deltaX) / 2)  {
-                    mSwiping = true;
-                    mSwipingSlop = (deltaX > 0 ? mSlop : -mSlop);
-                    mListView.requestDisallowInterceptTouchEvent(true);
 
-                    // Cancel ListView's touch (un-highlighting the item)
-                    MotionEvent cancelEvent = MotionEvent.obtain(motionEvent);
-                    cancelEvent.setAction(MotionEvent.ACTION_CANCEL |
-                            (motionEvent.getActionIndex()
-                                    << MotionEvent.ACTION_POINTER_INDEX_SHIFT));
-                    mListView.onTouchEvent(cancelEvent);
-                    view.onTouchEvent(cancelEvent);
-                    cancelEvent.recycle();
+                if (isDirectionValid(deltaX)) {
+                    if (Math.abs(deltaX) > mSlop && Math.abs(deltaY) < Math.abs(deltaX) / 2) {
+                        mSwiping = true;
+                        mSwipingSlop = (deltaX > 0 ? mSlop : -mSlop);
+                        mListView.requestDisallowInterceptTouchEvent(true);
+
+                        // Cancel ListView's touch (un-highlighting the item)
+                        MotionEvent cancelEvent = MotionEvent.obtain(motionEvent);
+                        cancelEvent.setAction(MotionEvent.ACTION_CANCEL |
+                                (motionEvent.getActionIndex()
+                                        << MotionEvent.ACTION_POINTER_INDEX_SHIFT));
+                        mListView.onTouchEvent(cancelEvent);
+                        view.onTouchEvent(cancelEvent);
+                        cancelEvent.recycle();
+                    }
+                } else {
+                    // If we swiped into wrong direction, act like this was the new
+                    // touch down point
+                    mDownX = motionEvent.getRawX();
+                    deltaX = 0;
                 }
 
                 if (mSwiping) {
@@ -337,12 +347,43 @@ public class SwipeDismissListViewTouchListener implements View.OnTouchListener {
         return false;
     }
 
-    private void dismiss(final View view, final int position, boolean dismissRight) {
+    /**
+     * Checks whether the delta of a swipe indicates, that the swipe is in the
+     * correct direction, regarding the direction set via
+     *
+     * @param deltaX The delta of x coordinate of the swipe.
+     * @return Whether the delta of a swipe is in the right direction.
+     */
+    private boolean isDirectionValid(float deltaX) {
+        Card card = (Card) mListView.getAdapter().getItem(mDownPosition);
+
+
+        int rtlSign = 1;
+        // On API level 17 and above, check if we are in a Right-To-Left layout
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+            if(mListView.getLayoutDirection() == View.LAYOUT_DIRECTION_RTL) {
+                rtlSign = -1;
+            }
+        }
+
+        // Check if swipe has been done in the corret direction
+        switch(card.getSwipeDirection()) {
+            default:
+            case BOTH:
+                return true;
+            case START:
+                return rtlSign * deltaX < 0;
+            case END:
+                return rtlSign * deltaX > 0;
+        }
+    }
+
+    private void dismiss(final View view, final int position, final boolean dismissRight) {
         ++mDismissAnimationRefCount;
         if (view == null) {
             // No view, shortcut to calling onDismiss to let it deal with adapter
             // updates and all that.
-            mCallbacks.onDismiss(mListView, new int[] { position });
+            mCallbacks.onDismiss(mListView, new int[] { position }, dismissRight);
             return;
         }
 
@@ -353,7 +394,7 @@ public class SwipeDismissListViewTouchListener implements View.OnTouchListener {
                 .setListener(new AnimatorListenerAdapter() {
                     @Override
                     public void onAnimationEnd(Animator animation) {
-                        performDismiss(view, position);
+                        performDismiss(view, position, dismissRight);
                     }
                 });
     }
@@ -375,7 +416,7 @@ public class SwipeDismissListViewTouchListener implements View.OnTouchListener {
         }
     }
 
-    private void performDismiss(final View dismissView, final int dismissPosition) {
+    private void performDismiss(final View dismissView, final int dismissPosition, final boolean dismissRight) {
         // Animate the dismissed list item to zero-height and fire the dismiss callback when
         // all dismissed list item animations have completed. This triggers layout on each animation
         // frame; in the future we may want to do something smarter and more performant.
@@ -398,7 +439,7 @@ public class SwipeDismissListViewTouchListener implements View.OnTouchListener {
                     for (int i = mPendingDismisses.size() - 1; i >= 0; i--) {
                         dismissPositions[i] = mPendingDismisses.get(i).position;
                     }
-                    mCallbacks.onDismiss(mListView, dismissPositions);
+                    mCallbacks.onDismiss(mListView, dismissPositions, dismissRight);
 
                     // Reset mDownPosition to avoid MotionEvent.ACTION_UP trying to start a dismiss
                     // animation with a stale position

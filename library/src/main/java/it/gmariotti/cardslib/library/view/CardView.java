@@ -452,11 +452,11 @@ public class CardView extends BaseCardView {
                 }
 
                 @Override
-                public void onDismiss(CardView cardView, Card card) {
+                public void onDismiss(CardView cardView, Card card, boolean dissmissRight) {
                     final ViewGroup vg = (ViewGroup)(cardView.getParent());
                     if (vg!=null){
                         vg.removeView(cardView);
-                        card.onSwipeCard();
+                        card.onSwipeCard(dissmissRight);
                     }
                 }
             }));

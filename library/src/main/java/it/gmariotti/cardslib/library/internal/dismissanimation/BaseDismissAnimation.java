@@ -54,7 +54,6 @@ public abstract class BaseDismissAnimation {
     protected boolean mDismissRight = true;
     protected Context mContext;
 
-
     private List<PendingDismissData> mPendingDismisses = new ArrayList<PendingDismissData>();
     private int mDownPosition;
     private int mDismissAnimationRefCount = 0;
@@ -98,7 +97,7 @@ public abstract class BaseDismissAnimation {
          * @param reverseSortedPositions An array of positions to dismiss, sorted in descending
          *                               order for convenience.
          */
-        void onDismiss(ListView listView, int[] reverseSortedPositions);
+        void onDismiss(ListView listView, int[] reverseSortedPositions, boolean dismissRight);
     }
 
 
@@ -243,7 +242,7 @@ public abstract class BaseDismissAnimation {
                     for (int i = mPendingDismisses.size() - 1; i >= 0; i--) {
                         dismissPositions[i] = mPendingDismisses.get(i).position;
                     }
-                    mCallbacks.onDismiss(mCardListView, dismissPositions);
+                    mCallbacks.onDismiss(mCardListView, dismissPositions, mDismissRight);
 
                     // Reset mDownPosition to avoid MotionEvent.ACTION_UP trying to start a dismiss
                     // animation with a stale position
@@ -308,7 +307,7 @@ public abstract class BaseDismissAnimation {
         }
 
         @Override
-        public void onDismiss(ListView listView, int[] reverseSortedPositions) {
+        public void onDismiss(ListView listView, int[] reverseSortedPositions, boolean dissmissRight) {
 
             int[] itemPositions=new int[reverseSortedPositions.length];
             String[] itemIds=new String[reverseSortedPositions.length];
@@ -324,7 +323,7 @@ public abstract class BaseDismissAnimation {
                     mBaseAdapter.remove(card);
                     //TODO CHANGE
                     if (card.getOnSwipeListener() != null){
-                        card.getOnSwipeListener().onSwipe(card);
+                        card.getOnSwipeListener().onSwipe(card, dissmissRight);
                     }
                 }
             }
