@@ -2,8 +2,7 @@ apply plugin: 'android-sdk-manager'
 apply plugin: 'android-library'
 
 repositories {
-    maven { url 'http://mvn-repo.thefabulous.com.s3-website-eu-west-1.amazonaws.com/releases' }
-    maven { url 'http://mvn-repo.thefabulous.com.s3-website-eu-west-1.amazonaws.com/snapshots' }
+    maven { url 'https://s3-eu-west-1.amazonaws.com/mvn-repo.thefabulous.com/snapshots' }
     mavenCentral()
 }
 
@@ -31,7 +30,7 @@ dependencies {
     //StaggeredGrid
     compile 'com.etsy.android.grid:library:1.0.5'
     //DynamicList
-    compile 'com.nhaarman.listviewanimations:library:2.6.2-SNAPSHOT@aar'
+    compile 'com.nhaarman.listviewanimations:library:2.6.1-SNAPSHOT@aar'
 }
 
 // Used to update in Maven
